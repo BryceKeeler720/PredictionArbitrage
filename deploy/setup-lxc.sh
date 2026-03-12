@@ -42,8 +42,10 @@ fi
 # 2. Create install directory
 mkdir -p "$INSTALL_DIR"
 
-# 3. Clone or copy repo
-if [ -n "$REPO_URL" ]; then
+# 3. Clone or copy repo (skip if source already present)
+if [ -f "$INSTALL_DIR/pyproject.toml" ]; then
+    echo "Source already present in $INSTALL_DIR, skipping clone/copy."
+elif [ -n "$REPO_URL" ]; then
     apt-get install -y git
     git clone "$REPO_URL" "$INSTALL_DIR"
 elif [ -d "/tmp/predarb-src" ]; then
