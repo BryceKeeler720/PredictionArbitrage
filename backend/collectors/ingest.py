@@ -60,6 +60,12 @@ async def _upsert_markets(session: AsyncSession, markets: list[MarketData]) -> i
     if not markets:
         return 0
 
+    # Deduplicate by (platform, platform_id) — keep last occurrence
+    seen: dict[tuple[str, str], MarketData] = {}
+    for m in markets:
+        seen[(m.platform, m.platform_id)] = m
+    markets = list(seen.values())
+
     now = datetime.now(UTC)
     total = 0
 
