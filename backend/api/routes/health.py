@@ -27,6 +27,7 @@ async def health(session: AsyncSession = Depends(get_session)) -> dict:
     for name, url in [
         ("polymarket", "https://gamma-api.polymarket.com/markets?limit=1"),
         ("kalshi", "https://api.elections.kalshi.com/trade-api/v2/markets?limit=1"),
+        ("manifold", "https://api.manifold.markets/v0/markets?limit=1"),
     ]:
         try:
             import httpx

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.collectors.base import BaseCollector, MarketData
 from backend.collectors.kalshi import KalshiCollector
+from backend.collectors.manifold import ManifoldCollector
 from backend.collectors.polymarket import PolymarketCollector
 from backend.collectors.predictit import PredictItCollector
 from backend.db import async_session
@@ -19,6 +20,7 @@ COLLECTORS: list[type[BaseCollector]] = [
     PolymarketCollector,
     KalshiCollector,
     PredictItCollector,
+    ManifoldCollector,
 ]
 
 

@@ -12,7 +12,7 @@ function Nav() {
     <nav className="border-b border-gray-800 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 flex items-center h-14 gap-6">
         <span className="font-bold text-lg tracking-tight">
-          <span className="text-blue-400">Pred</span>Arb
+          <span className="text-blue-400">Prediction</span>Arbitrage
         </span>
         <div className="flex gap-1">
           <NavLink to="/" className={linkClass} end>

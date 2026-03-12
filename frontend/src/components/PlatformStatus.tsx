@@ -8,6 +8,7 @@ export function PlatformStatus({ health }: { health: HealthStatus | undefined })
     { name: "Database", status: health.database },
     { name: "Polymarket", status: health.polymarket },
     { name: "Kalshi", status: health.kalshi },
+    { name: "Manifold", status: health.manifold },
   ];
 
   return (

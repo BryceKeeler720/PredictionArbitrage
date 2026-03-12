@@ -59,6 +59,7 @@ export interface HealthStatus {
   database: string;
   polymarket: string;
   kalshi: string;
+  manifold: string;
 }
 
 export function useOpportunities(status = "active") {
