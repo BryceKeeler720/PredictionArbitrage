@@ -66,10 +66,8 @@ DATABASE_URL=postgresql+asyncpg://predarb:${DB_PASSWORD}@postgres:5432/predarb
 REDIS_URL=redis://redis:6379/0
 DB_PASSWORD=${DB_PASSWORD}
 
-# Discord Webhooks — fill these in
-DISCORD_WEBHOOK_LOW=
-DISCORD_WEBHOOK_MEDIUM=
-DISCORD_WEBHOOK_HIGH=
+# Discord Webhook — fill this in
+DISCORD_WEBHOOK_URL=
 
 # App Config
 POLL_INTERVAL_SECONDS=60

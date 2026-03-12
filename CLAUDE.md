@@ -77,7 +77,7 @@ docker compose logs -f predarb
 Copy `.env.example` to `.env` and fill in:
 - `DATABASE_URL` — PostgreSQL connection string
 - `REDIS_URL` — Redis connection string  
-- `DISCORD_WEBHOOK_LOW`, `DISCORD_WEBHOOK_MEDIUM`, `DISCORD_WEBHOOK_HIGH` — Discord webhook URLs
+- `DISCORD_WEBHOOK_URL` — Discord webhook URL for alerts (tier shown in message)
 - `KALSHI_API_KEY`, `KALSHI_API_SECRET` — Only needed for trading (Phase 4)
 - `POLYMARKET_PRIVATE_KEY` — Only needed for trading (Phase 4)
 

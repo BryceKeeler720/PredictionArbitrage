@@ -26,9 +26,7 @@ class Settings(BaseSettings):
     # Alerts
     alert_cooldown_minutes: int = 30
     daily_digest_hour: int = 8
-    discord_webhook_low: str = ""
-    discord_webhook_medium: str = ""
-    discord_webhook_high: str = ""
+    discord_webhook_url: str = ""
 
     # Platform keys (Phase 4 — trading only)
     kalshi_api_key: str = ""

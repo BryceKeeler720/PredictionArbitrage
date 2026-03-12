@@ -39,23 +39,26 @@ def _mark_alerted(opp: ArbOpportunity) -> None:
     _alert_cooldowns[key] = datetime.now(UTC)
 
 
-def _get_tier(profit_pct: float) -> tuple[str, str, int]:
-    """Return (tier_name, webhook_url, embed_color) based on profit %."""
+def _get_tier(profit_pct: float) -> tuple[str, int]:
+    """Return (tier_name, embed_color) based on profit %."""
     if profit_pct >= 5.0:
-        return "HIGH", settings.discord_webhook_high, 0xED4245  # Red
+        return "HIGH", 0xED4245  # Red
     elif profit_pct >= 3.0:
-        return "MEDIUM", settings.discord_webhook_medium, 0xFEE75C  # Yellow
+        return "MEDIUM", 0xFEE75C  # Yellow
     else:
-        return "LOW", settings.discord_webhook_low, 0x57F287  # Green
+        return "LOW", 0x57F287  # Green
 
 
-def _build_embed(opp: ArbOpportunity, tier: str) -> dict:
+def _build_embed(opp: ArbOpportunity, tier: str, color: int) -> dict:
     """Build Discord embed payload."""
     leg_fields = []
     for i, leg in enumerate(opp.legs, 1):
         leg_fields.append({
             "name": f"Leg {i}",
-            "value": f"Buy **{leg.side}** on **{leg.platform.title()}** @ ${leg.price:.3f}",
+            "value": (
+                f"Buy **{leg.side}** on **{leg.platform.title()}**"
+                f" @ ${leg.price:.3f}"
+            ),
             "inline": True,
         })
 
@@ -77,16 +80,22 @@ def _build_embed(opp: ArbOpportunity, tier: str) -> dict:
     if opp.max_size_usd > 0:
         thinnest = min(
             opp.legs,
-            key=lambda leg: leg.available_size_usd if leg.available_size_usd > 0 else float("inf"),
+            key=lambda leg: (
+                leg.available_size_usd if leg.available_size_usd > 0 else float("inf")
+            ),
         )
         fields.append({
             "name": "Max Size",
-            "value": f"${opp.max_size_usd:,.0f} (limited by {thinnest.platform.title()} depth)",
+            "value": (
+                f"${opp.max_size_usd:,.0f}"
+                f" (limited by {thinnest.platform.title()} depth)"
+            ),
             "inline": True,
         })
 
-    emoji = {"HIGH": "\U0001f534", "MEDIUM": "\U0001f7e1", "LOW": "\U0001f7e2"}.get(tier, "")
-    _, _, color = _get_tier(opp.profit_pct)
+    emoji = {"HIGH": "\U0001f534", "MEDIUM": "\U0001f7e1", "LOW": "\U0001f7e2"}.get(
+        tier, ""
+    )
 
     return {
         "embeds": [{
@@ -95,7 +104,8 @@ def _build_embed(opp: ArbOpportunity, tier: str) -> dict:
             "fields": fields,
             "footer": {
                 "text": (
-                    f"PredArb \u2022 Detected at {opp.detected_at.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                    f"PredArb \u2022 Detected at"
+                    f" {opp.detected_at.strftime('%Y-%m-%dT%H:%M:%SZ')}"
                 ),
             },
         }]
@@ -111,8 +121,9 @@ async def _post_webhook(url: str, payload: dict) -> None:
             retry_after = resp.json().get("retry_after", 5)
             logger.warning("Discord rate limited, retry after %ss", retry_after)
             import asyncio
+
             await asyncio.sleep(retry_after)
-            raise Exception("Rate limited")  # Trigger retry
+            raise Exception("Rate limited")  # noqa: TRY002
         resp.raise_for_status()
 
 
@@ -125,25 +136,22 @@ async def send_alert(opp: ArbOpportunity) -> bool:
         logger.debug("Skipping alert for %s — on cooldown", opp.match_id)
         return False
 
-    tier, webhook_url, _ = _get_tier(opp.profit_pct)
-
+    webhook_url = settings.discord_webhook_url
     if not webhook_url:
-        # Fall back to any configured webhook
-        webhook_url = (
-            settings.discord_webhook_high
-            or settings.discord_webhook_medium
-            or settings.discord_webhook_low
-        )
-        if not webhook_url:
-            logger.debug("No Discord webhook configured, skipping alert")
-            return False
+        logger.debug("No Discord webhook configured, skipping alert")
+        return False
 
-    payload = _build_embed(opp, tier)
+    tier, color = _get_tier(opp.profit_pct)
+    payload = _build_embed(opp, tier, color)
 
     try:
         await _post_webhook(webhook_url, payload)
         _mark_alerted(opp)
-        logger.info("Discord alert sent: %s (%.2f%% profit)", opp.question[:50], opp.profit_pct)
+        logger.info(
+            "Discord alert sent: %s (%.2f%% profit)",
+            opp.question[:50],
+            opp.profit_pct,
+        )
         return True
     except Exception:
         logger.exception("Failed to send Discord alert")
