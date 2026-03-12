@@ -2,7 +2,15 @@ import { useState } from "react";
 import { useMarkets } from "../hooks/useApi";
 import { PlatformBadge } from "../components/PlatformBadge";
 
-const PLATFORMS = ["all", "polymarket", "kalshi", "predictit"];
+const PLATFORMS = ["all", "polymarket", "kalshi", "predictit", "manifold"];
+
+const PLATFORM_LABELS: Record<string, string> = {
+  all: "All Platforms",
+  polymarket: "Polymarket",
+  kalshi: "Kalshi",
+  predictit: "PredictIt",
+  manifold: "Manifold",
+};
 
 export function Markets() {
   const [platform, setPlatform] = useState("all");
@@ -36,7 +44,7 @@ export function Markets() {
                 : "bg-gray-800 text-gray-400 hover:bg-gray-700"
             }`}
           >
-            {p === "all" ? "All Platforms" : p}
+            {PLATFORM_LABELS[p] ?? p}
           </button>
         ))}
       </div>
