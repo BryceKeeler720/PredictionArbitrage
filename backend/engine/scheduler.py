@@ -245,6 +245,7 @@ async def run_arb_detection() -> dict:
                     yes_price=m.yes_price,
                     no_price=m.no_price,
                     liquidity=m.liquidity,
+                    source_url=m.source_url or "",
                 )
                 for m in real_money_markets
             ]
@@ -287,6 +288,7 @@ async def run_arb_detection() -> dict:
                             "effective_cost": leg.effective_cost,
                             "available_size_usd": leg.available_size_usd,
                             "cost_fraction": leg.cost_fraction,
+                            "source_url": leg.source_url,
                         }
                         for leg in opp.legs
                     ],

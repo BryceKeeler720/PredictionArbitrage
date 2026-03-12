@@ -21,6 +21,7 @@ export interface Opportunity {
     effective_cost: number;
     available_size_usd: number;
     cost_fraction: number;
+    source_url: string;
   }[];
   total_cost: number;
   guaranteed_profit: number;

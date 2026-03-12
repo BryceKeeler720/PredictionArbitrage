@@ -97,7 +97,7 @@ export function OpportunityTable({ opportunities }: { opportunities: Opportunity
           <tr className="border-b border-gray-800 text-gray-400 text-left">
             <th className="py-3 px-4">Question</th>
             <th className="py-3 px-4">Platforms</th>
-            <SortHeader label="Cost/\u00A2" sortKey="total_cost" align="text-right" />
+            <SortHeader label="Cost" sortKey="total_cost" align="text-right" />
             <SortHeader label="Profit" sortKey="profit_pct" align="text-right" />
             <SortHeader label="Max Size" sortKey="max_size_usd" align="text-right" />
             <SortHeader label="Match" sortKey="match_confidence" align="text-right" />
@@ -123,7 +123,7 @@ export function OpportunityTable({ opportunities }: { opportunities: Opportunity
                     </div>
                   </td>
                   <td className="py-3 px-4 text-right font-mono">
-                    {(opp.total_cost * 100).toFixed(1)}\u00A2
+                    ${opp.total_cost.toFixed(4)}
                   </td>
                   <td className="py-3 px-4 text-right">
                     <ProfitBadge pct={opp.profit_pct} />
@@ -163,10 +163,9 @@ function ExpandedDetail({
   investAmount: number;
   setInvestAmount: (n: number) => void;
 }) {
-  // Calculate how many "$1 contracts" you can buy with investAmount
   const contractsPerDollar = 1 / opp.total_cost;
   const numContracts = investAmount * contractsPerDollar;
-  const totalPayout = numContracts; // each contract pays $1
+  const totalPayout = numContracts;
   const totalProfit = totalPayout - investAmount;
   const exceedsLiquidity = opp.max_size_usd > 0 && investAmount > opp.max_size_usd;
 
@@ -180,9 +179,22 @@ function ExpandedDetail({
         <div className="grid grid-cols-2 gap-3">
           {opp.legs.map((leg, i) => (
             <div key={i} className="rounded-lg bg-gray-800/60 border border-gray-700/50 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-medium text-gray-500">Leg {i + 1}</span>
-                <PlatformBadge platform={leg.platform} />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500">Leg {i + 1}</span>
+                  <PlatformBadge platform={leg.platform} />
+                </div>
+                {leg.source_url && (
+                  <a
+                    href={leg.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    View on {leg.platform}
+                  </a>
+                )}
               </div>
               <div className="text-lg font-mono">
                 Buy{" "}
@@ -210,7 +222,7 @@ function ExpandedDetail({
             </div>
           ))}
         </div>
-        <div className="mt-2 flex gap-6 text-xs text-gray-500">
+        <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-500">
           <span>
             Total cost per contract: <span className="text-white font-mono">${opp.total_cost.toFixed(4)}</span>
           </span>
@@ -232,22 +244,24 @@ function ExpandedDetail({
           Investment Calculator
         </h3>
 
-        <div className="flex items-center gap-3 mb-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center gap-3 mb-4" onClick={(e) => e.stopPropagation()}>
           <label className="text-sm text-gray-400">Invest:</label>
-          <span className="text-gray-400">$</span>
-          <input
-            type="number"
-            min="1"
-            step="10"
-            className="w-28 rounded bg-gray-800 border border-gray-600 text-sm px-3 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
-            value={investAmount}
-            onChange={(e) => setInvestAmount(Math.max(1, Number(e.target.value)))}
-          />
+          <div className="flex items-center">
+            <span className="text-gray-400 mr-1">$</span>
+            <input
+              type="number"
+              min="1"
+              step="10"
+              className="w-28 rounded bg-gray-800 border border-gray-600 text-sm px-3 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
+              value={investAmount}
+              onChange={(e) => setInvestAmount(Math.max(1, Number(e.target.value)))}
+            />
+          </div>
           <div className="flex gap-1.5">
             {QUICK_AMOUNTS.map((amt) => (
               <button
                 key={amt}
-                className={`px-2 py-1 rounded text-xs border transition-colors ${
+                className={`px-2.5 py-1 rounded text-xs border transition-colors ${
                   investAmount === amt
                     ? "bg-blue-600 border-blue-500 text-white"
                     : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
@@ -274,7 +288,7 @@ function ExpandedDetail({
                   {formatUSD(legDollars)}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {leg.side} &middot; ~{legContracts.toFixed(0)} contracts
+                  Buy {leg.side} &middot; ~{legContracts.toFixed(0)} contracts
                 </div>
               </div>
             );
@@ -302,8 +316,8 @@ function ExpandedDetail({
         </div>
 
         {exceedsLiquidity && (
-          <div className="mt-2 text-xs text-red-400 flex items-center gap-1">
-            <span>Warning: Investment exceeds available liquidity ({formatUSD(opp.max_size_usd)})</span>
+          <div className="mt-2 text-xs text-red-400">
+            Warning: Investment exceeds available liquidity ({formatUSD(opp.max_size_usd)})
           </div>
         )}
       </div>

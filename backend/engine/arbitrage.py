@@ -24,6 +24,8 @@ class ArbLeg:
     fee_rate: float
     effective_cost: float
     available_size_usd: float
+    cost_fraction: float = 0.0
+    source_url: str = ""
 
 
 @dataclass
@@ -54,6 +56,7 @@ class MarketPrices:
     yes_price: float = 0.0
     no_price: float = 0.0
     liquidity: float = 0.0
+    source_url: str = ""
 
 
 def detect_arbitrage(
@@ -177,6 +180,7 @@ def _check_pair(
             effective_cost=cost_a,
             available_size_usd=a.liquidity,
             cost_fraction=round(frac_a, 4),
+            source_url=a.source_url,
         ),
         ArbLeg(
             platform=b.platform,
@@ -187,6 +191,7 @@ def _check_pair(
             effective_cost=cost_b,
             available_size_usd=b.liquidity,
             cost_fraction=round(frac_b, 4),
+            source_url=b.source_url,
         ),
     ]
 
