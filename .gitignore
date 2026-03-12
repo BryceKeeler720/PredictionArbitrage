@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Database
+*.db
+
+# Alembic
+backend/migrations/versions/*.py
+!backend/migrations/versions/.gitkeep
+
+# Skill file (local)
+prediction-arb.skill
