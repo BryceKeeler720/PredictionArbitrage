@@ -24,8 +24,7 @@ frontend/dist/
 *.db
 
 # Alembic
-backend/migrations/versions/*.py
-!backend/migrations/versions/.gitkeep
+backend/migrations/versions/__pycache__/
 
 # Skill file (local)
 prediction-arb.skill
