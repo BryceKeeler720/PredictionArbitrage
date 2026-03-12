@@ -163,6 +163,10 @@ def _check_pair(
     if max_size < min_liquidity_usd and max_size != float("inf"):
         return None
 
+    # Position sizing: each leg's fraction of total cost
+    frac_a = cost_a / total_cost if total_cost > 0 else 0.5
+    frac_b = cost_b / total_cost if total_cost > 0 else 0.5
+
     legs = [
         ArbLeg(
             platform=a.platform,
@@ -172,6 +176,7 @@ def _check_pair(
             fee_rate=fee_a.taker_fee,
             effective_cost=cost_a,
             available_size_usd=a.liquidity,
+            cost_fraction=round(frac_a, 4),
         ),
         ArbLeg(
             platform=b.platform,
@@ -181,8 +186,11 @@ def _check_pair(
             fee_rate=fee_b.taker_fee,
             effective_cost=cost_b,
             available_size_usd=b.liquidity,
+            cost_fraction=round(frac_b, 4),
         ),
     ]
+
+    final_max_size = round(max_size, 2) if max_size != float("inf") else 0.0
 
     return ArbOpportunity(
         match_id=match_id,
@@ -193,5 +201,5 @@ def _check_pair(
         guaranteed_profit=round(raw_profit, 6),
         profit_after_fees=round(profit_after_fees, 6),
         profit_pct=round(profit_pct, 2),
-        max_size_usd=round(max_size, 2) if max_size != float("inf") else 0.0,
+        max_size_usd=final_max_size,
     )

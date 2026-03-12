@@ -20,6 +20,7 @@ export interface Opportunity {
     fee_rate: number;
     effective_cost: number;
     available_size_usd: number;
+    cost_fraction: number;
   }[];
   total_cost: number;
   guaranteed_profit: number;
@@ -29,6 +30,15 @@ export interface Opportunity {
   status: string;
   detected_at: string;
   description: string;
+  match_confidence: number;
+}
+
+export interface OpportunityFilters {
+  min_profit?: number;
+  max_profit?: number;
+  platform?: string;
+  min_liquidity?: number;
+  sort?: string;
 }
 
 export interface Market {
@@ -62,10 +72,17 @@ export interface HealthStatus {
   manifold: string;
 }
 
-export function useOpportunities(status = "active") {
-  return useQuery<{ opportunities: Opportunity[] }>({
-    queryKey: ["opportunities", status],
-    queryFn: () => fetchJson(`/opportunities?status=${status}&limit=100`),
+export function useOpportunities(status = "active", filters?: OpportunityFilters) {
+  const params = new URLSearchParams({ status, limit: "200" });
+  if (filters?.min_profit != null) params.set("min_profit", String(filters.min_profit));
+  if (filters?.max_profit != null) params.set("max_profit", String(filters.max_profit));
+  if (filters?.platform) params.set("platform", filters.platform);
+  if (filters?.min_liquidity != null) params.set("min_liquidity", String(filters.min_liquidity));
+  if (filters?.sort) params.set("sort", filters.sort);
+
+  return useQuery<{ opportunities: Opportunity[]; total: number }>({
+    queryKey: ["opportunities", status, filters],
+    queryFn: () => fetchJson(`/opportunities?${params}`),
     refetchInterval: 30_000,
   });
 }

@@ -11,7 +11,7 @@ Pipeline per cycle:
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, exists, func, select
+from sqlalchemy import String, and_, exists, func, select, update
 
 from backend.alerts.discord import send_alert
 from backend.collectors.ingest import run_collection_cycle
@@ -192,6 +192,23 @@ async def run_arb_detection() -> dict:
     opportunities_found = 0
     alerts_sent = 0
 
+    # Expire stale opportunities that involve play-money platforms
+    async with async_session() as session:
+        stale = await session.execute(
+            select(ArbitrageOpportunity.id)
+            .where(ArbitrageOpportunity.status == "active")
+            .where(ArbitrageOpportunity.legs.cast(String).contains("manifold"))
+        )
+        stale_ids = [row[0] for row in stale]
+        if stale_ids:
+            await session.execute(
+                update(ArbitrageOpportunity)
+                .where(ArbitrageOpportunity.id.in_(stale_ids))
+                .values(status="expired", expired_at=datetime.now(UTC))
+            )
+            await session.commit()
+            logger.info("Expired %d stale manifold opportunities", len(stale_ids))
+
     async with async_session() as session:
         # Get all active matches with their markets
         matches_result = await session.execute(select(MarketMatch))
@@ -210,6 +227,11 @@ async def run_arb_detection() -> dict:
             if len(member_markets) < 2:
                 continue
 
+            # Filter out Manifold (play money — not comparable to real-money platforms)
+            real_money_markets = [m for m in member_markets if m.platform != "manifold"]
+            if len(real_money_markets) < 2:
+                continue
+
             # Convert to price objects
             prices = [
                 MarketPrices(
@@ -224,7 +246,7 @@ async def run_arb_detection() -> dict:
                     no_price=m.no_price,
                     liquidity=m.liquidity,
                 )
-                for m in member_markets
+                for m in real_money_markets
             ]
 
             # Detect arbs
@@ -264,6 +286,7 @@ async def run_arb_detection() -> dict:
                             "fee_rate": leg.fee_rate,
                             "effective_cost": leg.effective_cost,
                             "available_size_usd": leg.available_size_usd,
+                            "cost_fraction": leg.cost_fraction,
                         }
                         for leg in opp.legs
                     ],
