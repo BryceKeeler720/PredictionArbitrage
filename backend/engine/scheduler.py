@@ -11,7 +11,7 @@ Pipeline per cycle:
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import and_, exists, func, select
 
 from backend.alerts.discord import send_alert
 from backend.collectors.ingest import run_collection_cycle
@@ -31,36 +31,77 @@ async def run_full_cycle() -> dict:
 
     # Step 1: Collect markets
     logger.info("=== Starting collection cycle ===")
-    collection_stats = await run_collection_cycle()
-    stats["collected"] = collection_stats
-    logger.info("Collection done: %s", collection_stats)
+    try:
+        collection_stats = await run_collection_cycle()
+        stats["collected"] = collection_stats
+        logger.info("Collection done: %s", collection_stats)
+    except Exception:
+        logger.exception("Collection cycle failed")
+        stats["collected"] = {}
 
     # Step 2: Match markets across platforms
     logger.info("=== Starting matching cycle ===")
-    match_stats = await run_matching_cycle()
-    stats["matched"] = match_stats
-    logger.info("Matching done: %d new matches", match_stats.get("new_matches", 0))
+    try:
+        match_stats = await run_matching_cycle()
+        stats["matched"] = match_stats
+        logger.info("Matching done: %d new matches", match_stats.get("new_matches", 0))
+    except Exception:
+        logger.exception("Matching cycle failed")
+        stats["matched"] = {}
 
     # Step 3: Detect arbitrage
     logger.info("=== Starting arb detection ===")
-    arb_stats = await run_arb_detection()
-    stats["arbitrage"] = arb_stats
-    logger.info("Arb detection done: %d opportunities", arb_stats.get("opportunities", 0))
+    try:
+        arb_stats = await run_arb_detection()
+        stats["arbitrage"] = arb_stats
+        logger.info("Arb detection done: %d opportunities", arb_stats.get("opportunities", 0))
+    except Exception:
+        logger.exception("Arb detection failed")
+        stats["arbitrage"] = {}
 
     return stats
 
 
 async def run_matching_cycle() -> dict:
-    """Run the matcher on all active markets from different platforms."""
-    async with async_session() as session:
-        result = await session.execute(
-            select(NormalizedMarket)
-            .where(NormalizedMarket.active.is_(True))
-            .where(NormalizedMarket.volume_24h > settings.min_volume_24h)
-        )
-        db_markets = result.scalars().all()
+    """Run the matcher on all active markets from different platforms.
 
-    if not db_markets:
+    Only loads markets that exist on at least 2 platforms and have some volume,
+    to keep the TF-IDF matrix manageable.
+    """
+    async with async_session() as session:
+        # Get platforms that have markets
+        platform_counts = await session.execute(
+            select(NormalizedMarket.platform, func.count())
+            .where(NormalizedMarket.active.is_(True))
+            .group_by(NormalizedMarket.platform)
+        )
+        platforms = {row[0]: row[1] for row in platform_counts}
+        logger.info("Matching: platforms with data: %s", platforms)
+
+        if len(platforms) < 2:
+            logger.info("Matching: need at least 2 platforms, skipping")
+            return {"total_markets": 0, "new_matches": 0, "platforms": len(platforms)}
+
+        # Load markets from non-Polymarket platforms (smaller sets) fully,
+        # and a sample from Polymarket to keep TF-IDF matrix manageable
+        all_markets: list[NormalizedMarket] = []
+        for platform in platforms:
+            query = (
+                select(NormalizedMarket)
+                .where(NormalizedMarket.active.is_(True))
+                .where(NormalizedMarket.platform == platform)
+                .where(NormalizedMarket.yes_price > 0.01)
+                .where(NormalizedMarket.yes_price < 0.99)
+            )
+            # For very large platforms, take only higher-volume markets
+            if platforms[platform] > 5000:
+                query = query.where(NormalizedMarket.volume_24h > 100).limit(5000)
+            result = await session.execute(query)
+            platform_markets = result.scalars().all()
+            all_markets.extend(platform_markets)
+            logger.info("Matching: loaded %d markets from %s", len(platform_markets), platform)
+
+    if len(all_markets) < 2:
         return {"total_markets": 0, "new_matches": 0}
 
     # Convert to MarketInfo for the matcher
@@ -72,7 +113,7 @@ async def run_matching_cycle() -> dict:
             category=m.category,
             close_time=m.close_time,
         )
-        for m in db_markets
+        for m in all_markets
     ]
 
     # Find matches
@@ -81,25 +122,48 @@ async def run_matching_cycle() -> dict:
         confidence_threshold=settings.match_confidence_threshold,
     )
 
-    # Persist new matches
+    # Persist new matches (with proper dedup)
     new_count = 0
+    skipped = 0
     async with async_session() as session:
         for candidate in candidates:
-            # Check if this pair already exists
-            await session.execute(
-                select(MarketMatchMember)
-                .join(
-                    MarketMatchMember,
-                    MarketMatchMember.match_id == MarketMatch.id,
-                    isouter=True,
+            # Look up market UUIDs first
+            mkt_a_result = await session.execute(
+                select(NormalizedMarket.id).where(
+                    NormalizedMarket.platform == candidate.market_a_platform,
+                    NormalizedMarket.platform_id == candidate.market_a_id,
                 )
-                .where(MarketMatchMember.market_id.in_([
-                    # Look up market UUIDs
-                ]))
             )
-            # For simplicity, deduplicate by checking if a match with these
-            # two platform+id combos already exists
-            # TODO: proper dedup query
+            mkt_a_uuid = mkt_a_result.scalar_one_or_none()
+
+            mkt_b_result = await session.execute(
+                select(NormalizedMarket.id).where(
+                    NormalizedMarket.platform == candidate.market_b_platform,
+                    NormalizedMarket.platform_id == candidate.market_b_id,
+                )
+            )
+            mkt_b_uuid = mkt_b_result.scalar_one_or_none()
+
+            if not mkt_a_uuid or not mkt_b_uuid:
+                continue
+
+            # Dedup: check if these two markets are already in a match together
+            alias_a = MarketMatchMember.__table__.alias("ma")
+            alias_b = MarketMatchMember.__table__.alias("mb")
+            existing = await session.execute(
+                select(alias_a.c.match_id).where(
+                    and_(
+                        alias_a.c.market_id == mkt_a_uuid,
+                        alias_b.c.market_id == mkt_b_uuid,
+                        alias_a.c.match_id == alias_b.c.match_id,
+                    )
+                )
+            )
+            if existing.first():
+                skipped += 1
+                continue
+
+            # Create new match
             match = MarketMatch(
                 canonical_question=candidate.market_a_title,
                 match_confidence=candidate.confidence,
@@ -109,26 +173,18 @@ async def run_matching_cycle() -> dict:
             session.add(match)
             await session.flush()
 
-            # Look up market UUIDs
-            for pid, pplat in [
-                (candidate.market_a_id, candidate.market_a_platform),
-                (candidate.market_b_id, candidate.market_b_platform),
-            ]:
-                mkt_result = await session.execute(
-                    select(NormalizedMarket.id).where(
-                        NormalizedMarket.platform == pplat,
-                        NormalizedMarket.platform_id == pid,
-                    )
-                )
-                mkt_uuid = mkt_result.scalar_one_or_none()
-                if mkt_uuid:
-                    session.add(MarketMatchMember(match_id=match.id, market_id=mkt_uuid))
-
+            session.add(MarketMatchMember(match_id=match.id, market_id=mkt_a_uuid))
+            session.add(MarketMatchMember(match_id=match.id, market_id=mkt_b_uuid))
             new_count += 1
 
         await session.commit()
 
-    return {"total_markets": len(db_markets), "new_matches": new_count}
+    logger.info("Matching: %d new, %d skipped (already matched)", new_count, skipped)
+    return {
+        "total_markets": len(all_markets),
+        "new_matches": new_count,
+        "skipped": skipped,
+    }
 
 
 async def run_arb_detection() -> dict:
@@ -164,6 +220,8 @@ async def run_arb_detection() -> dict:
                     yes_bid=m.yes_bid,
                     no_ask=m.no_ask,
                     no_bid=m.no_bid,
+                    yes_price=m.yes_price,
+                    no_price=m.no_price,
                     liquidity=m.liquidity,
                 )
                 for m in member_markets
@@ -179,6 +237,18 @@ async def run_arb_detection() -> dict:
             )
 
             for opp in opps:
+                # Check if same match already has an active opportunity
+                existing_opp = await session.execute(
+                    select(exists().where(
+                        and_(
+                            ArbitrageOpportunity.match_id == match.id,
+                            ArbitrageOpportunity.status == "active",
+                        )
+                    ))
+                )
+                if existing_opp.scalar():
+                    continue
+
                 opportunities_found += 1
 
                 # Persist to DB

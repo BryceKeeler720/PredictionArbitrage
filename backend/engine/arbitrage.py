@@ -51,7 +51,9 @@ class MarketPrices:
     yes_bid: float | None
     no_ask: float | None
     no_bid: float | None
-    liquidity: float
+    yes_price: float = 0.0
+    no_price: float = 0.0
+    liquidity: float = 0.0
 
 
 def detect_arbitrage(
@@ -108,17 +110,17 @@ def _check_pair(
     """Check one directional pairing for arb."""
 
     if direction == "yes_a_no_b":
-        price_a = a.yes_ask
+        price_a = a.yes_ask or a.yes_price
         side_a = "YES"
-        price_b = b.no_ask
+        price_b = b.no_ask or b.no_price
         side_b = "NO"
     else:
-        price_a = a.no_ask
+        price_a = a.no_ask or a.no_price
         side_a = "NO"
-        price_b = b.yes_ask
+        price_b = b.yes_ask or b.yes_price
         side_b = "YES"
 
-    # Need valid ask prices on both sides
+    # Need valid prices on both sides
     if price_a is None or price_b is None:
         return None
     if price_a <= 0 or price_b <= 0:
