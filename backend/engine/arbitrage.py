@@ -39,6 +39,7 @@ class ArbOpportunity:
     profit_after_fees: float
     profit_pct: float
     max_size_usd: float
+    expires_at: datetime | None = None
     detected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -57,6 +58,7 @@ class MarketPrices:
     no_price: float = 0.0
     liquidity: float = 0.0
     source_url: str = ""
+    close_time: datetime | None = None
 
 
 def detect_arbitrage(
@@ -197,6 +199,10 @@ def _check_pair(
 
     final_max_size = round(max_size, 2) if max_size != float("inf") else 0.0
 
+    # Earliest close time across both markets = when this opportunity expires
+    close_times = [t for t in (a.close_time, b.close_time) if t is not None]
+    expires_at = min(close_times) if close_times else None
+
     return ArbOpportunity(
         match_id=match_id,
         question=question,
@@ -207,4 +213,5 @@ def _check_pair(
         profit_after_fees=round(profit_after_fees, 6),
         profit_pct=round(profit_pct, 2),
         max_size_usd=final_max_size,
+        expires_at=expires_at,
     )

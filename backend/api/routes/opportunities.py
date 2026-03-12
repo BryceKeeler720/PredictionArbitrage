@@ -94,6 +94,7 @@ async def list_opportunities(
             "max_size_usd": o.max_size_usd,
             "status": o.status,
             "detected_at": o.detected_at.isoformat(),
+            "expires_at": o.expires_at.isoformat() if o.expires_at else None,
             "description": o.description,
             "match_confidence": confidence_map.get(o.match_id, 0.0),
         })

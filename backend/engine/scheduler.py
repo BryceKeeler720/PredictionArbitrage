@@ -246,6 +246,7 @@ async def run_arb_detection() -> dict:
                     no_price=m.no_price,
                     liquidity=m.liquidity,
                     source_url=m.source_url or "",
+                    close_time=m.close_time,
                 )
                 for m in real_money_markets
             ]
@@ -297,6 +298,7 @@ async def run_arb_detection() -> dict:
                     profit_after_fees=opp.profit_after_fees,
                     profit_pct=opp.profit_pct,
                     max_size_usd=opp.max_size_usd,
+                    expires_at=opp.expires_at,
                     description=opp.question[:500],
                 )
                 session.add(db_opp)

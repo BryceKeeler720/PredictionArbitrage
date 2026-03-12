@@ -30,6 +30,21 @@ function formatTime(iso: string) {
   return d.toLocaleDateString();
 }
 
+function formatExpiry(iso: string | null): { text: string; urgent: boolean } {
+  if (!iso) return { text: "\u2014", urgent: false };
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  if (diffMs <= 0) return { text: "Expired", urgent: true };
+  const days = Math.floor(diffMs / 86_400_000);
+  const hours = Math.floor((diffMs % 86_400_000) / 3_600_000);
+  if (days > 30) return { text: `${Math.floor(days / 30)}mo`, urgent: false };
+  if (days > 0) return { text: `${days}d ${hours}h`, urgent: days <= 3 };
+  if (hours > 0) return { text: `${hours}h`, urgent: true };
+  const mins = Math.floor(diffMs / 60_000);
+  return { text: `${mins}m`, urgent: true };
+}
+
 function formatUSD(amount: number): string {
   if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
   if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
@@ -56,6 +71,11 @@ export function OpportunityTable({ opportunities }: { opportunities: Opportunity
       case "total_cost": return (a.total_cost - b.total_cost) * dir;
       case "max_size_usd": return (a.max_size_usd - b.max_size_usd) * dir;
       case "match_confidence": return ((a.match_confidence ?? 0) - (b.match_confidence ?? 0)) * dir;
+      case "expires_at": {
+        const ea = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
+        const eb = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
+        return (ea - eb) * dir;
+      }
       case "detected_at": return (new Date(a.detected_at).getTime() - new Date(b.detected_at).getTime()) * dir;
       default: return 0;
     }
@@ -101,6 +121,7 @@ export function OpportunityTable({ opportunities }: { opportunities: Opportunity
             <SortHeader label="Profit" sortKey="profit_pct" align="text-right" />
             <SortHeader label="Max Size" sortKey="max_size_usd" align="text-right" />
             <SortHeader label="Match" sortKey="match_confidence" align="text-right" />
+            <SortHeader label="Expires" sortKey="expires_at" align="text-right" />
             <SortHeader label="Detected" sortKey="detected_at" align="text-right" />
           </tr>
         </thead>
@@ -134,13 +155,19 @@ export function OpportunityTable({ opportunities }: { opportunities: Opportunity
                   <td className="py-3 px-4 text-right">
                     <ConfidenceBadge confidence={opp.match_confidence ?? 0} />
                   </td>
+                  <td className="py-3 px-4 text-right">
+                    {(() => {
+                      const exp = formatExpiry(opp.expires_at);
+                      return <span className={exp.urgent ? "text-red-400" : "text-gray-400"}>{exp.text}</span>;
+                    })()}
+                  </td>
                   <td className="py-3 px-4 text-right text-gray-400">
                     {formatTime(opp.detected_at)}
                   </td>
                 </tr>
                 {isExpanded && (
                   <tr key={`${opp.id}-detail`} className="bg-gray-900/40">
-                    <td colSpan={7} className="px-4 py-5">
+                    <td colSpan={8} className="px-4 py-5">
                       <ExpandedDetail opp={opp} investAmount={investAmount} setInvestAmount={setInvestAmount} />
                     </td>
                   </tr>

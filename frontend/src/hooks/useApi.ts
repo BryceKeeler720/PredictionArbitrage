@@ -30,6 +30,7 @@ export interface Opportunity {
   max_size_usd: number;
   status: string;
   detected_at: string;
+  expires_at: string | null;
   description: string;
   match_confidence: number;
 }

@@ -31,6 +31,7 @@ class ArbitrageOpportunity(Base):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Human-readable summary
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
