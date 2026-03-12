@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6380/0"
 
     # Polling
-    poll_interval_seconds: int = 60
+    poll_interval_seconds: int = 300  # 5 minutes — full cycle takes 2-3 min
     price_refresh_seconds: int = 30
 
     # Thresholds
